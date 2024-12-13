@@ -1,4 +1,3 @@
-import time
 import re
 import os
 import time
@@ -8,6 +7,7 @@ import argparse
 from tqdm import tqdm
 from gen_solution_prompt import sf_construct_prompt
 
+openai.api_key = os.getenv("OPENAI_API_KEY")
 
 def query_model(prompt, sample_size):
     os.environ["OPENAI_API_KEY"] = 'OPENAI_API'
@@ -44,7 +44,7 @@ def api_gpt3_5_response(prompt, n):
 
 
 class SolInfo():
-    def __init__(self, dataset_path, solution_path, extracted_solution_path, sample_size, target_bug):
+    def __init__(self, dataset_path, prompt_path, solution_path, extracted_solution_path, sample_size, target_bug):
         with open(dataset_path, 'r') as f:
             self.dataset = json.load(f)
         if target_bug is not None:
@@ -62,6 +62,7 @@ class SolInfo():
             self.extracted_solution_path = extracted_solution_path
         self.sample_size = sample_size
         self.target_bug = target_bug
+        self.prompt_path = prompt_path
         return
 
 
@@ -95,6 +96,9 @@ def get_solutions(sol_info):
         solutions[bug_name] = {}
         prompt = sf_construct_prompt(sol_info.dataset, bug_name)
         solutions[bug_name]['prompt'] = prompt
+        if sol_info.prompt_path is not None:
+            with open(sol_info.prompt_path, 'w') as f:
+                json.dump(prompt, f, indent=2)
         solutions[bug_name]['solutions'] = query_model(prompt, sol_info.sample_size)
     return solutions
 
@@ -110,7 +114,8 @@ def extract_solutions(raw_solution):
             curr_root_cause = extract_root_cause(solution)
             if curr_root_cause not in extracted_solutions[bug_name]:
                 extracted_solutions[bug_name][curr_root_cause] = split_solution_lst
-            extracted_solutions[bug_name][curr_root_cause].extend(split_solution_lst)
+            else:
+                extracted_solutions[bug_name][curr_root_cause].extend(split_solution_lst)
 
     return extracted_solutions
 
@@ -118,14 +123,17 @@ def extract_solutions(raw_solution):
 def main():
     sol_info = SolInfo(
         args.d,
+        args.p,
         args.o,
         args.eo,
         args.s,
         args.bug
     )
-    solutions = get_solutions(sol_info)
-    with open(sol_info.solution_path, 'w') as f:
-        json.dump(solutions, f, indent=2)
+    # solutions = get_solutions(sol_info)
+    # with open(sol_info.solution_path, 'w') as f:
+    #     json.dump(solutions, f, indent=2)
+    with open(sol_info.solution_path, 'r') as f:
+      solutions = json.load(f)
     extracted_solutions = extract_solutions(solutions)
     with open(sol_info.extracted_solution_path, 'w') as f:
         json.dump(extracted_solutions, f, indent=2)
@@ -135,6 +143,7 @@ def main():
 def parse_arguments():
     parser = argparse.ArgumentParser()
     parser.add_argument('-d', type=str, required=True, help='dataset path')
+    parser.add_argument('-p', type=str, required=False, help='prompt path')
     parser.add_argument('-o', type=str, required=True, help='raw_solution path')
     parser.add_argument('-eo', type=str, required=False, help='extracted_solution path')
     parser.add_argument('-s', type=int, required=False, help='sample_size', default=1)

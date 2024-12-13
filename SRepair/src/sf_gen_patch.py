@@ -112,7 +112,7 @@ def opensrc_model_apr(apr_info):
 
                 curr_patch['prompt'].append(apr_prompt)
                 suggest_patch = []
-                batch_size = 5
+                batch_size = 1
                 if tokenizer.pad_token is None:
                     tokenizer.pad_token = tokenizer.eos_token
                 pad_token_id = tokenizer.convert_tokens_to_ids(tokenizer.pad_token)
